@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: metabase-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # 必要に応じて増減
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: metabase-plugins-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi  # 必要に応じて増減
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metabase
+  template:
+    metadata:
+      labels:
+        app: metabase
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: black1  # 指定ノードに配置
+      containers:
+        - name: metabase
+          image: metabase/metabase:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MB_DB_FILE
+              value: "/metabase-data/metabase.db"  # SQLite データの保存先
+          volumeMounts:
+            - name: metabase-storage
+              mountPath: "/metabase-data"
+            - name: metabase-plugins
+              mountPath: "/plugins"
+      volumes:
+        - name: metabase-storage
+          persistentVolumeClaim:
+            claimName: metabase-pvc
+        - name: metabase-plugins
+          persistentVolumeClaim:
+            claimName: metabase-plugins-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metabase
+spec:
+  selector:
+    app: metabase
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP
