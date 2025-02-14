@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: insert-cronjob
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "Asia/Tokyo"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: fetch
+              image: sirogami/scripts:latest
+              imagePullPolicy: Always
+              args: ["insert"]
+              env:
+                - name: CLICKHOUSE_DSN
+                  value: "clickhouse+http://update_user:update_user_password@10.42.1.11:8123/atcoder"
+          restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: complete-cronjob
+spec:
+  schedule: "0 3 * * *"
+  timeZone: "Asia/Tokyo"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: fetch
+              image: sirogami/scripts:latest
+              imagePullPolicy: Always
+              args: ["complete"]
+              env:
+                - name: CLICKHOUSE_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-dsn
+                      key: dsn
+          restartPolicy: Never
+---
+#テーブルを全体をリプレイスする方針、後回し
+#apiVersion: batch/v1
+#kind: CronJob
+#metadata:
+#  name: insert-all-cronjob
+#spec:
+#  schedule: "0 4 * * 0"
+#  jobTemplate:
+#    spec:
+#      template:
+#        spec:
+#          containers:
+#            - name: fetch
+#              image: sirogami/scripts:latest
+#              imagePullPolicy: Always
+#              args: ["insert_all"]
+#          restartPolicy: OnFailure
