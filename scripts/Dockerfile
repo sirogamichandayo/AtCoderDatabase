@@ -10,4 +10,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY scripts.py .
 RUN chmod +x scripts.py
 
-ENTRYPOINT ["./scripts.py"]
+ENTRYPOINT ["python", "./scripts.py"]

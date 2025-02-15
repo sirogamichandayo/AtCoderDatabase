@@ -1,10 +1,15 @@
-#!/usr/bin/env python3
 import argparse
 import os
 import time
 
 import clickhouse_connect
 import requests
+
+
+def request_with_wait(method, url, **kwargs):
+    response = requests.request(method, url, **kwargs)
+    time.sleep(3)
+    return response
 
 def make_clickhouse_client():
     dsn = os.getenv("CLICKHOUSE_DSN")
@@ -14,6 +19,68 @@ def make_clickhouse_client():
 def complete_submissions(args):
     client = make_clickhouse_client()
     client.command(f"OPTIMIZE TABLE atcoder.submissions FINAL")
+
+def update_problem_models(args):
+    client = make_clickhouse_client()
+
+    tmp_table_name = f"problem_models_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}"
+    client.command(f"""CREATE TABLE atcoder.{tmp_table_name}
+    (
+        `problem_id`       String,
+        `slope`            Nullable(Float64),
+        `intercept`        Nullable(Float64),
+        `variance`         Nullable(Float64),
+        `difficulty`       Nullable(Int32),
+        `discrimination`   Nullable(Float64),
+        `irt_loglikelihood` Nullable(Float64),
+        `irt_users`        Nullable(UInt32),
+        `is_experimental`  Nullable(Bool)
+    )
+    ENGINE = MergeTree
+    ORDER BY problem_id
+    SETTINGS index_granularity = 8192
+    """)
+    url = "https://kenkoooo.com/atcoder/resources/problem-models.json"
+    headers = {"Accept-Encoding": "gzip, deflate, br"}
+    response = request_with_wait('GET', url, headers=headers)
+    response.raise_for_status()
+    data = response.json()
+
+    rows_to_insert = []
+    for problem_id, model in data.items():
+        row = (
+            problem_id,
+            model.get("slope"),
+            model.get("intercept"),
+            model.get("variance"),
+            model.get("difficulty"),
+            model.get("discrimination"),
+            model.get("irt_loglikelihood"),
+            model.get("irt_users"),
+            model.get("is_experimental")
+        )
+
+        rows_to_insert.append(row)
+
+    client.insert(
+        table=tmp_table_name,
+        data=rows_to_insert,
+        column_names=[
+            "problem_id",
+            "slope",
+            "intercept",
+            "variance",
+            "difficulty",
+            "discrimination",
+            "irt_loglikelihood",
+            "irt_users",
+            "is_experimental"
+        ]
+    )
+
+    client.command(f"EXCHANGE TABLES atcoder.problem_models atcoder.{tmp_table_name}")
+
+    client.command(f"DROP TABLE atcoder.{tmp_table_name}")
 
 
 def update_submissions(args):
@@ -33,8 +100,8 @@ def update_submissions(args):
         current_unix_time = result.result_rows[0][0]
         print(f"Requesting with unixtime: {current_unix_time}")
         url = f"https://kenkoooo.com/atcoder/atcoder-api/v3/from/{current_unix_time+1}"
-        headers = {"Accept-Encoding": "gzip, deflate, br"}
-        response = requests.get(url, headers=headers)
+        headers = {"Accept-Encoding": "gzip"}
+        response = request_with_wait('GET', url, headers=headers)
         response.raise_for_status()
 
         # 取得したデータを JSON としてパース
@@ -96,8 +163,8 @@ def all_update_submissions(args):
     while True:
         print(f"Requesting with unixtime: {current_unixtime}")
         url = f"https://kenkoooo.com/atcoder/atcoder-api/v3/from/{current_unixtime}"
-        headers = {"Accept-Encoding": "gzip, deflate, br"}
-        response = requests.get(url, headers=headers)
+        headers = {"Accept-Encoding": "gzip"}
+        response = request_with_wait('GET', url, headers=headers)
         response.raise_for_status()
 
         # 取得したデータを JSON としてパース
@@ -164,6 +231,9 @@ def main():
 
     parser_insert = subparsers.add_parser("complete", help="submissionsテーブルに Complete 処理を走らせる")
     parser_insert.set_defaults(func=complete_submissions)
+
+    parser_insert = subparsers.add_parser("update_problems", help="problem modelテーブルを最新に更新する")
+    parser_insert.set_defaults(func=update_problem_models)
 
     args = parser.parse_args()
     args.func(args)

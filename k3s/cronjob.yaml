@@ -16,7 +16,34 @@ spec:
               args: ["insert"]
               env:
                 - name: CLICKHOUSE_DSN
-                  value: "clickhouse+http://update_user:update_user_password@10.42.1.11:8123/atcoder"
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-dsn
+                      key: dsn
+          restartPolicy: Never
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: update-problem-cronjob
+spec:
+  schedule: "0 * * * *"
+  timeZone: "Asia/Tokyo"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: fetch
+              image: sirogami/scripts:latest
+              imagePullPolicy: Always
+              args: ["update_problems"]
+              env:
+                - name: CLICKHOUSE_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-dsn
+                      key: dsn
           restartPolicy: Never
 ---
 apiVersion: batch/v1
