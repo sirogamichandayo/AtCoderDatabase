@@ -16,7 +16,10 @@ spec:
               args: ["insert"]
               env:
                 - name: CLICKHOUSE_DSN
-                  value: "clickhouse+http://update_user:update_user_password@10.42.1.11:8123/atcoder"
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-dsn
+                      key: dsn
           restartPolicy: Never
 ---
 apiVersion: batch/v1

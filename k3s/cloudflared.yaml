@@ -24,7 +24,8 @@ spec:
             - --config
             - /etc/cloudflared/config/config.yaml
             - --no-autoupdate
-            - --http2-origin
+            - --protocol
+            - http2
             - run
           livenessProbe:
             httpGet:
