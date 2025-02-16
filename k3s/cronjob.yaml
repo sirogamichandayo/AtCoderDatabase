@@ -27,7 +27,7 @@ kind: CronJob
 metadata:
   name: update-problem-cronjob
 spec:
-  schedule: "0 * * * *"
+  schedule: "0 3 * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
@@ -75,7 +75,7 @@ kind: CronJob
 metadata:
   name: update-rating-cronjob
 spec:
-  schedule: "0 3 * * *"
+  schedule: "0 0 * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
