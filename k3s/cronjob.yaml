@@ -70,7 +70,31 @@ spec:
                       key: dsn
           restartPolicy: Never
 ---
-#テーブルを全体をリプレイスする方針、後回し
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: update-rating-cronjob
+spec:
+  schedule: "0 3 * * *"
+  timeZone: "Asia/Tokyo"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: fetch
+              image: sirogami/scripts:latest
+              imagePullPolicy: Always
+              args: ["update_rating"]
+              env:
+                - name: CLICKHOUSE_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-dsn
+                      key: dsn
+          restartPolicy: Never
+---
+# submission テーブルを全体をリプレイスするやつ、後回し
 #apiVersion: batch/v1
 #kind: CronJob
 #metadata:
