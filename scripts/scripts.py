@@ -156,6 +156,7 @@ SETTINGS index_granularity = 8192
     for problem in problems:
         problem_id = problem.get("id")
         model = problem_models.get(problem_id) or {}
+        print(f"problem_id: {problem_id}, model: {model}")
         difficulty = model.get("difficulty")
         if difficulty is not None:
             # see: https://github.com/kenkoooo/AtCoderProblems/blob/master/lambda-functions/time-estimator/rating.py#L30-L33
@@ -172,9 +173,60 @@ SETTINGS index_granularity = 8192
             url = f"https://atcoder.jp/api/contests/{contest_id}"
             response = request_with_wait('GET', url)
             response.raise_for_status()
-            problem_models = response.json()
-            contest_type = problem_models.get("ContestType")
+            p = response.json()
+            contest_type = p.get("ContestType")
             contest_type_map[contest_id] = contest_type
+
+        # 一部ヒュのがアルゴとして検出されるので弾く、コンテストとしては "algorithm" だけど問題としては "heuristic" になるものの一覧
+        # 絶対ミスあるけどしゃーなし
+        heuristic_list = [
+            # 2718 点よりでかい点数
+            "tessoku_book_fr"
+            "tessoku_book_at"
+            "tessoku_book_aw"
+            "joisc2017_e"
+            "ddcc2019_machine_a"
+            "math_and_algorithm_bw"
+            "pakencamp_2019_day2_a"
+            "math_and_algorithm_bx"
+            "ddcc2019_machine_b"
+
+            # 提出されたポイントの種類が30以上のもの、絶対ミスある
+            "s8pc_6_i",
+            "s8pc_5_i",
+            "s8pc_4_h",
+            "s8pc_3_h",
+            "birthday0410_x",
+            "joisc2021_a1",
+            "xmascon16_b",
+            "joisc2020_l",
+            "joisc2021_a6",
+            "joisc2020_o",
+            "xmascon24_g",
+            "apio_mansion",
+            "joisc2020_m",
+            "loadchecking_a",
+            "iroha2019_day3_i",
+            "utpc2012_06",
+            "joisc2021_a4",
+            "joisc2021_a2",
+            "joisc2021_a3",
+            "joisc2021_a5",
+            "joisc2020_k",
+            "utpc2014_f",
+            "joisc2018_e",
+            "geocon2013_a",
+            "pakencamp_2018_day3_h",
+            "tenka1_2016_final_b",
+            "pakencamp_2020_day2_h",
+            "pakencamp_2019_day4_h",
+            "tenka1_2012_final_d",
+            "joisc2008_election2",
+            "tenka1_2013_qualB_e",
+            "pakencamp_2019_day3_h"
+        ]
+        if problem_id in heuristic_list:
+            contest_type_map[contest_id] = "heuristic"
 
         row = (
             problem_id,
