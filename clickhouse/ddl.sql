@@ -7,24 +7,26 @@ ENGINE = MergeTree;
 
 CREATE TABLE atcoder.submissions (
     id UInt64,
-    epoch_second UInt64,
+    epoch_second Int64,
     problem_id String,
     contest_id String,
     user_id String,
     language String,
     point Float64,
-    length UInt32,
+    length Int32,
     result String,
-    execution_time UInt32 DEFAULT -1
-) ENGINE = ReplacingMergeTree(id)
-ORDER BY epoch_second
+    execution_time Nullable(Int32), -- TODO: nullable 外す
+    created_at DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(created_at)
+ORDER BY (user_id, epoch_second, id)
 SETTINGS index_granularity = 8192;
+
 
 CREATE TABLE atcoder.rating_history (
     user_id String,
     contest_id String,
-    is_rated UInt8,
-    place UInt32,
+    is_rated Int8,
+    place Int32,
     old_rating Int32,
     new_rating Int32,
     performance Int32,
@@ -32,13 +34,13 @@ CREATE TABLE atcoder.rating_history (
     contest_name_en String,
     contest_screen_name String,
     end_time DateTime,
-    contest_type String,
+    contest_type Enum8('algorithm' = 0, 'heuristic' = 1),
     user_name String,
     country String,
     affiliation String,
     rating Int32,
-    competitions UInt32,
-    atcoder_rank UInt32
+    competitions Int32,
+    atcoder_rank Int32
 ) ENGINE = ReplacingMergeTree()
 ORDER BY (user_id, end_time, contest_id)
 SETTINGS index_granularity = 8192;

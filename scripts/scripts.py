@@ -54,10 +54,14 @@ def update_rating_history(args):
         if is_updated:
             continue
 
+        print(f"start {contest_id}")
         url = f"https://atcoder.jp/contests/{contest_id}/results/json"
         response = request_with_wait('GET', url)
         response.raise_for_status()
         data = response.json()
+
+        if len(data) == 0:
+            continue
 
         rows_to_insert = []
         for result in data:
@@ -85,28 +89,9 @@ def update_rating_history(args):
 
         client.insert(
             table="atcoder.rating_history",
-            data=rows_to_insert,
-            column_names=[
-                "user_id",
-                "contest_id",
-                "is_rated",
-                "place",
-                "old_rating",
-                "new_rating",
-                "performance",
-                "contest_name",
-                "contest_name_en",
-                "contest_screen_name",
-                "end_time",
-                "contest_type",
-                "user_name",
-                "country",
-                "affiliation",
-                "rating",
-                "competitions",
-                "atcoder_rank"
-            ]
+            data=rows_to_insert
         )
+        print(f"success {contest_id}")
 
 
 
@@ -122,8 +107,8 @@ CREATE TABLE atcoder.{tmp_table_name}
     `slope`            Float64 default nan,
     `intercept`        Float64 default nan,
     `variance`         Float64 default nan,
-    `difficulty`       Int32 default bitShiftLeft(1::Int32, 31),
-    `clip_difficulty`  Int32 default bitShiftLeft(1::Int32, 31),
+    `difficulty`       Int32 default -123456789,
+    `clip_difficulty`  Int32 default -123456789,
     `discrimination`   Float64 default nan,
     `irt_loglikelihood` Float64 default nan,
     `irt_users`        Int32 default -1,
@@ -132,7 +117,8 @@ CREATE TABLE atcoder.{tmp_table_name}
     `problem_index`    String,
     `name`             String,
     `title`            String,
-    `problem_type`     Enum8('algorithm' = 0, 'heuristic' = 1)
+    `problem_type`     Enum8('algorithm' = 0, 'heuristic' = 1),
+    `contest_type`     Enum8('algorithm' = 0, 'heuristic' = 1),
 )
 ENGINE = MergeTree
 ORDER BY clip_difficulty
@@ -143,8 +129,8 @@ SETTINGS index_granularity = 8192
         "slope": float("nan"),
         "intercept": float("nan"),
         "variance": float("nan"),
-        "difficulty": 1 << 31,
-        "clip_difficulty": 1 << 31,
+        "difficulty": -123456789,
+        "clip_difficulty": -123456789,
         "discrimination": float("nan"),
         "irt_loglikelihood": float("nan"),
         "irt_users": -1,
@@ -164,6 +150,7 @@ SETTINGS index_granularity = 8192
     problem_models = response.json()
 
     rows_to_insert = []
+    # TODO: API 叩く数を減らすために既存データからデータを埋める、contest type は何もいじってないのでできるはず
     contest_type_map = {
         # "contest_id": "contest type"
     }
@@ -192,20 +179,21 @@ SETTINGS index_granularity = 8192
             contest_type = p.get("ContestType")
             contest_type_map[contest_id] = contest_type
 
+        contest_type = contest_type_map[contest_id]
         problem_type = contest_type_map[contest_id]
         # 一部ヒュのがアルゴとして検出されるので弾く、コンテストとしては "algorithm" だけど問題としては "heuristic" になるものの一覧
         # 絶対ミスあるけどしゃーなし
         heuristic_list = [
             # 2718 点よりでかい点数
-            "tessoku_book_fr"
-            "tessoku_book_at"
-            "tessoku_book_aw"
-            "joisc2017_e"
-            "ddcc2019_machine_a"
-            "math_and_algorithm_bw"
-            "pakencamp_2019_day2_a"
-            "math_and_algorithm_bx"
-            "ddcc2019_machine_b"
+            "tessoku_book_fr",
+            "tessoku_book_at",
+            "tessoku_book_aw",
+            "joisc2017_e",
+            "ddcc2019_machine_a",
+            "math_and_algorithm_bw",
+            "pakencamp_2019_day2_a",
+            "math_and_algorithm_bx",
+            "ddcc2019_machine_b",
 
             # 提出されたポイントの種類が30以上のもの、絶対ミスある
             "s8pc_6_i",
@@ -259,7 +247,8 @@ SETTINGS index_granularity = 8192
             problem.get("problem_index"),
             problem.get("name"),
             problem.get("title"),
-            problem_type
+            problem_type,
+            contest_type
         )
 
         rows_to_insert.append(row)
@@ -267,23 +256,6 @@ SETTINGS index_granularity = 8192
     client.insert(
         table=tmp_table_name,
         data=rows_to_insert,
-        column_names=[
-            "problem_id",
-            "slope",
-            "intercept",
-            "variance",
-            "difficulty",
-            "clip_difficulty",
-            "discrimination",
-            "irt_loglikelihood",
-            "irt_users",
-            "is_experimental",
-            "contest_id",
-            "problem_index",
-            "name",
-            "title",
-            "problem_type"
-        ]
     )
 
     client.command(f"EXCHANGE TABLES atcoder.{original_table_name} AND atcoder.{tmp_table_name}")
