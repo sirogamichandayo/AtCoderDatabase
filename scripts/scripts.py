@@ -6,6 +6,8 @@ import datetime
 import clickhouse_connect
 import requests
 
+def none_get(value, default):
+    return value if value is not None else default
 
 def request_with_wait(method, url, **kwargs):
     response = requests.request(method, url, **kwargs)
@@ -17,9 +19,10 @@ def make_clickhouse_client():
     client = clickhouse_connect.get_client(dsn=dsn)
     return client
 
-def complete_submissions(args):
+def complete_tables(args):
     client = make_clickhouse_client()
     client.command(f"OPTIMIZE TABLE atcoder.submissions FINAL")
+    client.command(f"OPTIMIZE TABLE atcoder.rating_history FINAL")
 
 def update_rating_history(args):
     """
@@ -116,25 +119,37 @@ def update_problem_models(args):
 CREATE TABLE atcoder.{tmp_table_name}
 (
     `problem_id`       String,
-    `slope`            Nullable(Float64),
-    `intercept`        Nullable(Float64),
-    `variance`         Nullable(Float64),
-    `difficulty`       Nullable(Int32),
-    `clip_difficulty`  Nullable(Int32),
-    `discrimination`   Nullable(Float64),
-    `irt_loglikelihood` Nullable(Float64),
-    `irt_users`        Nullable(UInt32),
-    `is_experimental`  Nullable(Bool),
+    `slope`            Float64 default nan,
+    `intercept`        Float64 default nan,
+    `variance`         Float64 default nan,
+    `difficulty`       Int32 default bitShiftLeft(1::Int32, 31),
+    `clip_difficulty`  Int32 default bitShiftLeft(1::Int32, 31),
+    `discrimination`   Float64 default nan,
+    `irt_loglikelihood` Float64 default nan,
+    `irt_users`        Int32 default -1,
+    `is_experimental`  Int8 default -1,
     `contest_id`       String,
     `problem_index`    String,
     `name`             String,
     `title`            String,
-    `contest_type`     Enum8('algorithm' = 0, 'heuristic' = 1)
+    `problem_type`     Enum8('algorithm' = 0, 'heuristic' = 1)
 )
 ENGINE = MergeTree
-ORDER BY problem_id
+ORDER BY clip_difficulty
 SETTINGS index_granularity = 8192
 """)
+
+    default_values = {
+        "slope": float("nan"),
+        "intercept": float("nan"),
+        "variance": float("nan"),
+        "difficulty": 1 << 31,
+        "clip_difficulty": 1 << 31,
+        "discrimination": float("nan"),
+        "irt_loglikelihood": float("nan"),
+        "irt_users": -1,
+        "is_experimental": -1,
+    }
 
     url = "https://kenkoooo.com/atcoder/resources/problems.json"
     headers = {"Accept-Encoding": "gzip"}
@@ -177,6 +192,7 @@ SETTINGS index_granularity = 8192
             contest_type = p.get("ContestType")
             contest_type_map[contest_id] = contest_type
 
+        problem_type = contest_type_map[contest_id]
         # 一部ヒュのがアルゴとして検出されるので弾く、コンテストとしては "algorithm" だけど問題としては "heuristic" になるものの一覧
         # 絶対ミスあるけどしゃーなし
         heuristic_list = [
@@ -226,24 +242,24 @@ SETTINGS index_granularity = 8192
             "pakencamp_2019_day3_h"
         ]
         if problem_id in heuristic_list:
-            contest_type_map[contest_id] = "heuristic"
+            problem_type = 1
 
         row = (
             problem_id,
-            model.get("slope"),
-            model.get("intercept"),
-            model.get("variance"),
-            model.get("difficulty"),
-            clip_difficulty,
-            model.get("discrimination"),
-            model.get("irt_loglikelihood"),
-            model.get("irt_users"),
-            model.get("is_experimental"),
+            none_get(model.get("slope"), default_values["slope"]),
+            none_get(model.get("intercept"), default_values["intercept"]),
+            none_get(model.get("variance"), default_values["variance"]),
+            none_get(model.get("difficulty"), default_values["difficulty"]),
+            none_get(clip_difficulty, default_values["clip_difficulty"]),
+            none_get(model.get("discrimination"), default_values["discrimination"]),
+            none_get(model.get("irt_loglikelihood"), default_values["irt_loglikelihood"]),
+            none_get(model.get("irt_users"), default_values["irt_users"]),
+            none_get(model.get("is_experimental"), default_values["is_experimental"]),
             problem.get("contest_id"),
             problem.get("problem_index"),
             problem.get("name"),
             problem.get("title"),
-            contest_type_map[contest_id]
+            problem_type
         )
 
         rows_to_insert.append(row)
@@ -266,7 +282,7 @@ SETTINGS index_granularity = 8192
             "problem_index",
             "name",
             "title",
-            "contest_type"
+            "problem_type"
         ]
     )
 
@@ -417,8 +433,8 @@ def main():
     parser_insert = subparsers.add_parser("insert_all", help="ClickHouseにデータを挿入する")
     parser_insert.set_defaults(func=all_update_submissions)
 
-    parser_insert = subparsers.add_parser("complete", help="submissionsテーブルに Complete 処理を走らせる")
-    parser_insert.set_defaults(func=complete_submissions)
+    parser_insert = subparsers.add_parser("complete", help="テーブルに Complete 処理を走らせる")
+    parser_insert.set_defaults(func=complete_tables)
 
     parser_insert = subparsers.add_parser("update_problems", help="problem modelテーブルを最新に更新する")
     parser_insert.set_defaults(func=update_problem_models)

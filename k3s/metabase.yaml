@@ -38,12 +38,12 @@ spec:
         kubernetes.io/hostname: black1  # 指定ノードに配置
       containers:
         - name: metabase
-          image: metabase/metabase:latest
+          image: sirogami/metabase:v0.52.1
           ports:
             - containerPort: 3000
           env:
             - name: MB_DB_FILE
-              value: "/metabase-data/metabase.db"  # SQLite データの保存先
+              value: "/metabase-data/metabase.db"
           volumeMounts:
             - name: metabase-storage
               mountPath: "/metabase-data"
