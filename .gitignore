@@ -1,2 +1,3 @@
 .idea
 /k3s/secret.yaml
+/clickhouse/init.sql

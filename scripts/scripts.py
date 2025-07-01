@@ -21,8 +21,9 @@ def make_clickhouse_client():
 
 def complete_tables(args):
     client = make_clickhouse_client()
-    client.command(f"OPTIMIZE TABLE atcoder.submissions FINAL")
-    client.command(f"OPTIMIZE TABLE atcoder.rating_history FINAL")
+    client.command(f"OPTIMIZE TABLE atcoder.submissions on cluster cluster1 FINAL")
+    client.command(f"OPTIMIZE TABLE atcoder.rating_history on cluster cluster1 FINAL")
+    client.command(f"OPTIMIZE TABLE atcoder.problem_models on cluster cluster1 FINAL")
 
 def update_rating_history(args):
     """
@@ -93,37 +94,39 @@ def update_rating_history(args):
         )
         print(f"success {contest_id}")
 
+def insert_contest_models(args):
+    client = make_clickhouse_client()
+
+    # JSON データを取得する URL（例として既知の JSON を使う場合）
+    url = "https://kenkoooo.com/atcoder/resources/contests.json"
+    headers = {"Accept-Encoding": "gzip"}
+    response = request_with_wait('GET', url, headers=headers)
+    response.raise_for_status()
+    contests = response.json()  # JSON はリスト形式になっている想定
+
+    rows_to_insert = []
+    for contest in contests:
+        # テーブル atcoder.contests のカラムは
+        # (id, start_epoch_second, duration_second, title, rate_change, created_at)
+        # created_at は DEFAULT now() で自動設定されるため、ここでは挿入対象外
+        row = (
+            contest.get("id"),
+            contest.get("start_epoch_second"),
+            contest.get("duration_second"),
+            contest.get("title"),
+            contest.get("rate_change")
+        )
+        rows_to_insert.append(row)
+
+    client.insert(
+        table="atcoder.contests",
+        data=rows_to_insert,
+        column_names=["id", "start_epoch_second", "duration_second", "title", "rate_change"]
+    )
 
 
 def update_problem_models(args):
     client = make_clickhouse_client()
-
-    tmp_table_name = f"problem_models_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}"
-    original_table_name = "problem_models"
-    client.command(f"""
-CREATE TABLE atcoder.{tmp_table_name}
-(
-    `problem_id`       String,
-    `slope`            Float64 default nan,
-    `intercept`        Float64 default nan,
-    `variance`         Float64 default nan,
-    `difficulty`       Int32 default -123456789,
-    `clip_difficulty`  Int32 default -123456789,
-    `discrimination`   Float64 default nan,
-    `irt_loglikelihood` Float64 default nan,
-    `irt_users`        Int32 default -1,
-    `is_experimental`  Int8 default -1,
-    `contest_id`       String,
-    `problem_index`    String,
-    `name`             String,
-    `title`            String,
-    `problem_type`     Enum8('algorithm' = 0, 'heuristic' = 1),
-    `contest_type`     Enum8('algorithm' = 0, 'heuristic' = 1),
-)
-ENGINE = MergeTree
-ORDER BY clip_difficulty
-SETTINGS index_granularity = 8192
-""")
 
     default_values = {
         "slope": float("nan"),
@@ -172,7 +175,7 @@ SETTINGS index_granularity = 8192
         # get contest type
         contest_id = problem.get("contest_id")
         if contest_id not in contest_type_map:
-            url = f"https://atcoder.jp/api/contests/{contest_id}"
+            url = f"https://kenkoooo.com/atcoder/resources/problems.json"
             response = request_with_wait('GET', url)
             response.raise_for_status()
             p = response.json()
@@ -254,13 +257,12 @@ SETTINGS index_granularity = 8192
         rows_to_insert.append(row)
 
     client.insert(
-        table=tmp_table_name,
+        table="atcoder.problem_models",
         data=rows_to_insert,
+        column_names=["problem_id", "slope", "intercept", "variance", "difficulty", "clip_difficulty", "discrimination",
+                      "irt_loglikelihood", "irt_users", "is_experimental", "contest_id", "problem_index", "name",
+                      "title", "problem_type", "contest_type"]
     )
-
-    client.command(f"EXCHANGE TABLES atcoder.{original_table_name} AND atcoder.{tmp_table_name}")
-
-    client.command(f"DROP TABLE atcoder.{tmp_table_name}")
 
 def update_submissions(args):
     """
@@ -413,6 +415,9 @@ def main():
 
     parser_insert = subparsers.add_parser("update_rating", help="レーティングテーブル更新")
     parser_insert.set_defaults(func=update_rating_history)
+
+    parser_insert = subparsers.add_parser("insert_contest", help="コンテストテーブル更新")
+    parser_insert.set_defaults(func=insert_contest_models)
 
     args = parser.parse_args()
     args.func(args)

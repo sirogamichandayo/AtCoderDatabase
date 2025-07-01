@@ -2,23 +2,53 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-cluster"
+  namespace: "clickhouse"
 spec:
   configuration:
+    files:
+      config.d/zookeeper_keeper.xml: |
+        <clickhouse>
+          <zookeeper>
+            <node>
+              <host>keeper-clickhouse-keeper</host>
+              <port>2181</port>
+            </node>
+          </zookeeper>
+        </clickhouse>
     clusters:
       - name: "cluster1"
+        layout:
+          replicasCount: 2
   defaults:
     templates:
-      podTemplate: clickhouse-default
+      podTemplate: clickhouse
+      serviceTemplate: clickhouse-service
       volumeClaimTemplate: clickhouse-storage
   templates:
     podTemplates:
-      - name: clickhouse-default
+      - name: clickhouse
+        metadata:
+          labels:
+            app: clickhouse
         spec:
           nodeSelector:
             clickhouse-node: "true"
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "app"
+                        operator: In
+                        values:
+                          - clickhouse
+                  topologyKey: "kubernetes.io/hostname"
           containers:
             - name: clickhouse
               image: clickhouse/clickhouse-server:latest
+              volumeMounts:
+                - name: clickhouse-storage
+                  mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
       - name: clickhouse-storage
         spec:
@@ -26,3 +56,51 @@ spec:
           resources:
             requests:
               storage: 50Gi
+    serviceTemplates:
+      - name: clickhouse-service
+        generateName: clickhouse-service
+        spec:
+          type: NodePort
+          ports:
+            - name: http
+              port: 8123
+              targetPort: 8123
+              nodePort: 31234
+            - name: tcp
+              port: 9000
+              targetPort: 9000
+              nodePort: 31235
+---
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: clickhouse-keeper
+  namespace: clickhouse
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-keeper
+      volumeClaimTemplate: data-volume
+  configuration:
+    clusters:
+      - name: test
+        layout:
+          replicasCount: 3
+    settings:
+      keeper_server/tcp_port: "2181"
+  templates:
+    podTemplates:
+      - name: clickhouse-keeper
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: Always
+              image: "clickhouse/clickhouse-keeper:latest"
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi

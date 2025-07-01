@@ -94,6 +94,30 @@ spec:
                       key: dsn
           restartPolicy: Never
 ---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: insert-contest-cronjob
+spec:
+  schedule: "0 1 * * *"
+  timeZone: "Asia/Tokyo"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: fetch
+              image: sirogami/scripts:latest
+              imagePullPolicy: Always
+              args: ["insert_contest"]
+              env:
+                - name: CLICKHOUSE_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: clickhouse-dsn
+                      key: dsn
+          restartPolicy: Never
+---
 # submission テーブルを全体をリプレイスするやつ、後回し
 #apiVersion: batch/v1
 #kind: CronJob
