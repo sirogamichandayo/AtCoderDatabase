@@ -1,12 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cronjobs
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: insert-cronjob
+  namespace: cronjobs
 spec:
   schedule: "*/15 * * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           containers:
@@ -26,11 +33,13 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: update-problem-cronjob
+  namespace: cronjobs
 spec:
   schedule: "0 3 * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           containers:
@@ -50,11 +59,13 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: complete-cronjob
+  namespace: cronjobs
 spec:
   schedule: "0 3 * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           containers:
@@ -74,11 +85,13 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: update-rating-cronjob
+  namespace: cronjobs
 spec:
   schedule: "0 0 * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           containers:
@@ -98,11 +111,13 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: insert-contest-cronjob
+  namespace: cronjobs
 spec:
   schedule: "0 1 * * *"
   timeZone: "Asia/Tokyo"
   jobTemplate:
     spec:
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           containers:
@@ -123,10 +138,12 @@ spec:
 #kind: CronJob
 #metadata:
 #  name: insert-all-cronjob
+#  namespace: cronjobs
 #spec:
 #  schedule: "0 4 * * 0"
 #  jobTemplate:
 #    spec:
+#      ttlSecondsAfterFinished: 3600
 #      template:
 #        spec:
 #          containers:
