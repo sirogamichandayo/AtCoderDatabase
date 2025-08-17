@@ -11,9 +11,12 @@ metadata:
 spec:
   schedule: "*/15 * * * *"
   timeZone: "Asia/Tokyo"
+  concurrencyPolicy: Replace
+  startingDeadlineSeconds: 1800
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 3600
+      activeDeadlineSeconds: 1800
       template:
         spec:
           containers:
@@ -37,9 +40,12 @@ metadata:
 spec:
   schedule: "0 3 * * *"
   timeZone: "Asia/Tokyo"
+  concurrencyPolicy: Replace
+  startingDeadlineSeconds: 1800
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 3600
+      activeDeadlineSeconds: 1800
       template:
         spec:
           containers:
@@ -63,9 +69,12 @@ metadata:
 spec:
   schedule: "0 3 * * *"
   timeZone: "Asia/Tokyo"
+  concurrencyPolicy: Replace
+  startingDeadlineSeconds: 1800
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 3600
+      activeDeadlineSeconds: 1800
       template:
         spec:
           containers:
@@ -89,9 +98,12 @@ metadata:
 spec:
   schedule: "0 0 * * *"
   timeZone: "Asia/Tokyo"
+  concurrencyPolicy: Replace
+  startingDeadlineSeconds: 1800
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 3600
+      activeDeadlineSeconds: 1800
       template:
         spec:
           containers:
@@ -115,9 +127,12 @@ metadata:
 spec:
   schedule: "0 1 * * *"
   timeZone: "Asia/Tokyo"
+  concurrencyPolicy: Replace
+  startingDeadlineSeconds: 1800  
   jobTemplate:
     spec:
       ttlSecondsAfterFinished: 3600
+      activeDeadlineSeconds: 1800
       template:
         spec:
           containers:
