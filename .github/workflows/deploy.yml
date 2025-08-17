@@ -17,4 +17,4 @@ jobs:
 
       - name: Deploy manifests
         run: |
-          kubectl apply -R -f k3s
+          kubectl --kubeconfig=/home/sirogami/.kube/config apply -R -f k3s
